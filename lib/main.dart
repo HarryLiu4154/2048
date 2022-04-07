@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:collection/collection.dart';
 
 const Color gridColor = Color.fromARGB(255, 187, 173, 160);
 const Color emptyTileColor = Color.fromARGB(255, 205, 193, 180);
@@ -79,12 +80,23 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
 
   // flattening a list of lists, turning into 1D
   Iterable<Tile> get flatGrid => grid.expand((element) => element);
+  // grid as a list of columns for swiping implementation
+  Iterable<List<Tile>> get columns => List.generate(4, (x) =>
+      List.generate(4, (y) => grid[y][x]));
 
   @override
   void initState() {
     super.initState();
 
     controller = AnimationController(vsync: this, duration: Duration(milliseconds: 200));
+    controller.addStatusListener((status) {
+      if ( status == AnimationStatus.completed) {
+        //check later
+        for (var element in flatGrid) {
+          element.resetAnimations();
+        }
+      }
+    });
 
     grid[1][2].value = 4;
     grid[3][2].value = 16;
@@ -144,6 +156,73 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
           ),
         ))));
 
+    bool canSwipe(List<Tile> tiles) {
+      for (int i = 0; i < tiles.length; ++i) {
+        // if there is an empty spot
+        if (tiles[i].value == 0) {
+          // checks if rest of the tiles are not 0, "is there a tile to move"
+          if (tiles.skip(i + 1).any((element) => element.value != 0)) {
+            return true;
+          }
+        }
+        else {
+          Tile? nextNonZero = tiles.skip(i + 1).firstWhereOrNull((element) =>
+          element.value != 0);
+
+          // check this later
+          // tiles can merge
+          if (nextNonZero != null && nextNonZero.value == tiles[i].value) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    bool canSwipeUp() => columns.any(canSwipe);
+    bool canSwipeDown() => columns.map((e) => e.reversed.toList()).any(canSwipe);
+    bool canSwipeLeft() => grid.any(canSwipe);
+    bool canSwipeRight() => grid.map((e) => e.reversed.toList()).any(canSwipe);
+
+    void doSwipe(void Function() swipeDirectionFunction) {
+      setState(() {
+        swipeDirectionFunction();
+
+        controller.forward(from: 0);
+      });
+    }
+
+    // This is a decently complicated algorithm which I have mostly sourced from THKP
+    // The credit of the logic goes to them
+    void mergeTiles(List<Tile> tiles) {
+      for (int i = 0; i < tiles.length; ++i) {
+        // this is assuming that we have already confirmed a merge/swipe, so we
+        // ignore empty spaces
+        Iterable<Tile> toCheck = tiles.skip(i).skipWhile((value) => value.value == 0);
+        if (toCheck.isNotEmpty) {
+          Tile t = toCheck.first;
+          Tile? mergeT = toCheck.skip(1).firstWhereOrNull((element) => element.value != 0);
+          if (mergeT != null && mergeT.value != t.value) {
+            mergeT = null;
+          }
+          if (tiles[i] != t || mergeT != null) {
+            int resultValue = t.value;
+            if (mergeT != null) {
+              resultValue += mergeT.value;
+              mergeT.value = 0;
+            }
+            t.value = 0;
+            tiles[i].value = resultValue;
+          }
+        }
+      }
+    }
+
+    void swipeUp() => columns.forEach(mergeTiles);
+    void swipeDown() => columns.map((e) => e.reversed.toList()).forEach(mergeTiles);
+    void swipeLeft() => grid.forEach(mergeTiles);
+    void swipeRight() => grid.map((e) => e.reversed.toList()).forEach(mergeTiles);
+
     return Scaffold(
       backgroundColor: backgroundColor,
       body: Center(
@@ -155,8 +234,24 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
             borderRadius: BorderRadius.circular(8.0),
             color: gridColor
           ),
-          child: Stack(
-            children: stackItems,
+          child: GestureDetector(
+            child: Stack(children: stackItems),
+            onVerticalDragEnd: (details) {
+              if (details.velocity.pixelsPerSecond.dy < -200 && canSwipeUp()) {
+                doSwipe(swipeUp);
+              }
+              else if (details.velocity.pixelsPerSecond.dy > 200 && canSwipeDown()) {
+                doSwipe(swipeDown);
+              }
+            },
+            onHorizontalDragEnd: (details) {
+              if (details.velocity.pixelsPerSecond.dx < -200 && canSwipeLeft()) {
+                doSwipe(swipeLeft);
+              }
+              else if (details.velocity.pixelsPerSecond.dx > 200 && canSwipeRight()) {
+                doSwipe(swipeRight);
+              }
+            },
           ),
         )
       ),
