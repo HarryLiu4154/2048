@@ -1,115 +1,165 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+
+const Color gridColor = Color.fromARGB(255, 187, 173, 160);
+const Color emptyTileColor = Color.fromARGB(255, 205, 193, 180);
+const Color tileTextColor = Color.fromARGB(255, 119, 110, 101);
+const Color backgroundColor = Color.fromARGB(255, 250, 248, 239);
+
+const Map<int, Color> numTileColor = {
+  2: Color.fromARGB(255, 238, 228, 218),
+  4: Color.fromARGB(255, 238, 225, 201),
+  8: Color.fromARGB(255, 243, 178, 122),
+  16: Color.fromARGB(255, 246, 150, 100),
+  32: Color.fromARGB(255, 247, 124, 95),
+  64: Color.fromARGB(255, 247, 96, 59),
+  128: Color.fromARGB(255, 237, 208, 115),
+  256: Color.fromARGB(255, 237, 204, 98),
+  512: Color.fromARGB(255, 237, 201, 80),
+  1024: Color.fromARGB(255, 237, 197, 63),
+  2048: Color.fromARGB(255, 237, 194, 46),
+  4096: Color.fromARGB(255, 16, 6, 0),
+  8192: Color.fromARGB(255, 16, 6, 0),
+};
 
 void main() {
-  runApp(const MyApp());
+  runApp(GameApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+class GameApp extends StatelessWidget {
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      title: '2080 With Friends',
+      home: Game(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
+class Tile {
+  int x;//
+  int y;//
+  int value;
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
+  late Animation<double> animatedX; //
+  late Animation<double> animatedY;
+  late Animation<int> animatedValue;
+  late Animation<double> scale;
 
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
+  Tile(this.x, this.y, this.value) {
+    resetAnimations();
+  }
 
-  final String title;
+  void resetAnimations() {
+    animatedX = AlwaysStoppedAnimation(x.toDouble());
+    animatedY = AlwaysStoppedAnimation(y.toDouble());
+    animatedValue = AlwaysStoppedAnimation(value);
+    scale = AlwaysStoppedAnimation(1.0);
 
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  }
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class Game extends StatefulWidget {
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  @override
+  _GameState createState() => _GameState();
+}
+
+class _GameState extends State<Game> with SingleTickerProviderStateMixin {
+
+  late AnimationController controller;
+
+  // outside is y axis, inside is x axis
+  List<List<Tile>> grid = List.generate(4, (y) =>
+      List.generate(4, (x) =>
+        Tile(x, y, 0)
+      )
+  );
+
+  // flattening a list of lists, turning into 1D
+  Iterable<Tile> get flatGrid => grid.expand((element) => element);
+
+  @override
+  void initState() {
+    super.initState();
+
+    controller = AnimationController(vsync: this, duration: Duration(milliseconds: 200));
+
+    grid[1][2].value = 4;
+    grid[3][2].value = 16;
+
+    flatGrid.forEach((element) => element.resetAnimations());
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    // adding some space between grid and edge of screen
+    double gridSize = MediaQuery.of(context).size.width - (16.0 * 2);
+    double tileSize = (gridSize - (4.0 * 2)) / 4.0;
+
+    List<Widget> stackItems = [];
+    stackItems.addAll(flatGrid.map((e) => Positioned(
+      left: e.x * tileSize,
+      top: e.y * tileSize,
+      width: tileSize,
+      height: tileSize,
+      child: Center(
+        child: Container(
+          width: tileSize - 4.0 * 2,
+          height: tileSize - 4.0 * 2,
+          decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8.0),
+              color: emptyTileColor
+          ),
+        )
+      ),
+    )));
+
+    stackItems.addAll(flatGrid.map((e) => AnimatedBuilder(
+        animation: controller,
+        builder: (context, child) => e.animatedValue.value == 0 ? SizedBox() : Positioned(
+          left: e.x * tileSize,
+          top: e.y * tileSize,
+          width: tileSize,
+          height: tileSize,
+          child: Center(
+            child: Container(
+              width: tileSize - 4.0 * 2,
+              height: tileSize - 4.0 * 2,
+              decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8.0),
+                  color: numTileColor[e.animatedValue.value]
+              ),
+              child: Center(
+                child: Text("${e.animatedValue.value}",
+                  style: TextStyle(
+                    color: e.animatedValue.value <= 4 ? tileTextColor : Colors.white,
+                    fontSize: 35,
+                    fontWeight: FontWeight.w900,
+                  )
+                ),
+              ),
+            )
+          ),
+        ))));
+
     return Scaffold(
-      appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
+      backgroundColor: backgroundColor,
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
-        ),
+        child: Container(
+          width: gridSize,
+          height: gridSize,
+          padding: const EdgeInsets.all(4.0),//
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8.0),
+            color: gridColor
+          ),
+          child: Stack(
+            children: stackItems,
+          ),
+        )
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
