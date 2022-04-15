@@ -57,7 +57,35 @@ class Tile {
     animatedY = AlwaysStoppedAnimation(y.toDouble());
     animatedValue = AlwaysStoppedAnimation(value);
     scale = AlwaysStoppedAnimation(1.0);
+  }
 
+  void move(Animation<double> parent, int x, int y) {
+    // tween from current location to the desired location
+    animatedX = Tween(begin: this.x.toDouble(), end: x.toDouble())
+        .animate(CurvedAnimation(parent: parent, curve: const Interval(0, 0.5)));
+    animatedY = Tween(begin: this.y.toDouble(), end: y.toDouble())
+        .animate(CurvedAnimation(parent: parent, curve: const Interval(0, 0.5)));
+  }
+
+
+  void bounce(Animation<double> parent) {
+    scale = TweenSequence([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.2), weight: 1.0),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.2), weight: 1.0)
+    ]).animate(CurvedAnimation(parent: parent, curve: const Interval(0.5, 1.0)));
+  }
+
+  // animation for new tile appearing
+  void appear(Animation<double> parent) {
+    scale = Tween(begin: 0.0, end: 1.0)
+        .animate(CurvedAnimation(parent: parent, curve: const Interval(0.5, 1.0)));
+  }
+
+  void changeTileValue(Animation<double> parent, int newValue) {
+    animatedValue = TweenSequence([
+      TweenSequenceItem(tween: ConstantTween(value), weight: 0.01),
+      TweenSequenceItem(tween: ConstantTween(newValue), weight: 0.99)
+    ]).animate(CurvedAnimation(parent: parent, curve: const Interval(0.5, 1.0)));
   }
 }
 
@@ -98,6 +126,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
       }
     });
 
+    grid[0][2].value = 4;
     grid[1][2].value = 4;
     grid[3][2].value = 16;
 
@@ -131,14 +160,14 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     stackItems.addAll(flatGrid.map((e) => AnimatedBuilder(
         animation: controller,
         builder: (context, child) => e.animatedValue.value == 0 ? SizedBox() : Positioned(
-          left: e.x * tileSize,
-          top: e.y * tileSize,
+          left: e.animatedX.value * tileSize,
+          top: e.animatedY.value * tileSize,
           width: tileSize,
           height: tileSize,
           child: Center(
             child: Container(
-              width: tileSize - 4.0 * 2,
-              height: tileSize - 4.0 * 2,
+              width: (tileSize - 4.0 * 2) * e.scale.value,
+              height: (tileSize - 4.0 * 2) * e.scale.value,
               decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8.0),
                   color: numTileColor[e.animatedValue.value]
@@ -207,9 +236,17 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
           }
           if (tiles[i] != t || mergeT != null) {
             int resultValue = t.value;
+            t.move(controller, tiles[i].x, tiles[i].y);
             if (mergeT != null) {
               resultValue += mergeT.value;
+
+              //plays animations
+              mergeT.move(controller, tiles[i].x, tiles[i].y);
+              mergeT.bounce(controller);
+              mergeT.changeTileValue(controller, resultValue);
+
               mergeT.value = 0;
+              t.changeTileValue(controller, 0);
             }
             t.value = 0;
             tiles[i].value = resultValue;
