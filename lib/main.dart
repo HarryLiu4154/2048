@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:collection/collection.dart';
+import 'dart:math';
 
 const Color gridColor = Color.fromARGB(255, 187, 173, 160);
 const Color emptyTileColor = Color.fromARGB(255, 205, 193, 180);
@@ -56,7 +57,7 @@ class Tile {
     animatedX = AlwaysStoppedAnimation(x.toDouble());
     animatedY = AlwaysStoppedAnimation(y.toDouble());
     animatedValue = AlwaysStoppedAnimation(value);
-    scale = AlwaysStoppedAnimation(1.0);
+    scale = const AlwaysStoppedAnimation(1.0);
   }
 
   void move(Animation<double> parent, int x, int y) {
@@ -67,7 +68,7 @@ class Tile {
         .animate(CurvedAnimation(parent: parent, curve: const Interval(0, 0.5)));
   }
 
-
+  // small "pop" animation at the end of a merge
   void bounce(Animation<double> parent) {
     scale = TweenSequence([
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.2), weight: 1.0),
@@ -97,40 +98,58 @@ class Game extends StatefulWidget {
 
 class _GameState extends State<Game> with SingleTickerProviderStateMixin {
 
-  late AnimationController controller;
+  late AnimationController _controller;
 
   // outside is y axis, inside is x axis
-  List<List<Tile>> grid = List.generate(4, (y) =>
+  final List<List<Tile>> _grid = List.generate(4, (y) =>
       List.generate(4, (x) =>
         Tile(x, y, 0)
       )
   );
+  final List<Tile> _toAdd = [];
 
   // flattening a list of lists, turning into 1D
-  Iterable<Tile> get flatGrid => grid.expand((element) => element);
+  Iterable<Tile> get _flatGrid => _grid.expand((element) => element);
   // grid as a list of columns for swiping implementation
-  Iterable<List<Tile>> get columns => List.generate(4, (x) =>
-      List.generate(4, (y) => grid[y][x]));
+  Iterable<List<Tile>> get _columns => List.generate(4, (x) =>
+      List.generate(4, (y) => _grid[y][x]));
 
   @override
   void initState() {
     super.initState();
 
-    controller = AnimationController(vsync: this, duration: Duration(milliseconds: 200));
-    controller.addStatusListener((status) {
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
+    _controller.addStatusListener((status) {
       if ( status == AnimationStatus.completed) {
         //check later
-        for (var element in flatGrid) {
+        for (var element in _toAdd) {
+          _grid[element.y][element.x].value = element.value;
+        }
+
+        for (var element in _flatGrid) {
           element.resetAnimations();
         }
+
+        _toAdd.clear();
       }
     });
 
-    grid[0][2].value = 4;
-    grid[1][2].value = 4;
-    grid[3][2].value = 16;
+    // generates first two tiles
+    var rng = Random();
+    var initialX1 = rng.nextInt(4);
+    var initialY1 = rng.nextInt(4);
+    var initialX2 = rng.nextInt(4);
+    var initialY2 = rng.nextInt(4);
+    _grid[initialY1][initialX1].value = (rng.nextInt(10) == 9) ? 4 : 2;
+    while (initialX2 == initialX1 && initialY2 == initialY1) {
+      initialX2 = rng.nextInt(4);
+      initialY2 = rng.nextInt(4);
+    }
+    _grid[initialY2][initialX2].value = (rng.nextInt(10) == 9) ? 4 : 2;
 
-    flatGrid.forEach((element) => element.resetAnimations());
+    for (var element in _flatGrid) {
+      element.resetAnimations();
+    }
   }
 
   @override
@@ -140,7 +159,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     double tileSize = (gridSize - (4.0 * 2)) / 4.0;
 
     List<Widget> stackItems = [];
-    stackItems.addAll(flatGrid.map((e) => Positioned(
+    stackItems.addAll(_flatGrid.map((e) => Positioned(
       left: e.x * tileSize,
       top: e.y * tileSize,
       width: tileSize,
@@ -157,9 +176,9 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
       ),
     )));
 
-    stackItems.addAll(flatGrid.map((e) => AnimatedBuilder(
-        animation: controller,
-        builder: (context, child) => e.animatedValue.value == 0 ? SizedBox() : Positioned(
+    stackItems.addAll([_flatGrid, _toAdd].expand((element) => element).map((e) => AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) => e.animatedValue.value == 0 ? const SizedBox() : Positioned(
           left: e.animatedX.value * tileSize,
           top: e.animatedY.value * tileSize,
           width: tileSize,
@@ -208,16 +227,30 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
       return false;
     }
 
-    bool canSwipeUp() => columns.any(canSwipe);
-    bool canSwipeDown() => columns.map((e) => e.reversed.toList()).any(canSwipe);
-    bool canSwipeLeft() => grid.any(canSwipe);
-    bool canSwipeRight() => grid.map((e) => e.reversed.toList()).any(canSwipe);
+    bool canSwipeUp() => _columns.any(canSwipe);
+    bool canSwipeDown() => _columns.map((e) => e.reversed.toList()).any(canSwipe);
+    bool canSwipeLeft() => _grid.any(canSwipe);
+    bool canSwipeRight() => _grid.map((e) => e.reversed.toList()).any(canSwipe);
+
+    // find empty spaces to add a new tile in, tile can be 2 or 4
+    void addNewTile() {
+      List<Tile> empty = _flatGrid.where((element) => element.value == 0).toList();
+      empty.shuffle();
+
+      var rng = Random();
+      var newTileNum = (rng.nextInt(10) == 9) ? 4 : 2;
+
+      // calling constructor and then appear animation
+      _toAdd.add(Tile(empty.first.x, empty.first.y, newTileNum)..appear(_controller));
+    }
 
     void doSwipe(void Function() swipeDirectionFunction) {
       setState(() {
         swipeDirectionFunction();
 
-        controller.forward(from: 0);
+        addNewTile();
+
+        _controller.forward(from: 0);
       });
     }
 
@@ -236,17 +269,17 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
           }
           if (tiles[i] != t || mergeT != null) {
             int resultValue = t.value;
-            t.move(controller, tiles[i].x, tiles[i].y);
+            t.move(_controller, tiles[i].x, tiles[i].y);
             if (mergeT != null) {
               resultValue += mergeT.value;
 
               //plays animations
-              mergeT.move(controller, tiles[i].x, tiles[i].y);
-              mergeT.bounce(controller);
-              mergeT.changeTileValue(controller, resultValue);
+              mergeT.move(_controller, tiles[i].x, tiles[i].y);
+              mergeT.bounce(_controller);
+              mergeT.changeTileValue(_controller, resultValue);
 
               mergeT.value = 0;
-              t.changeTileValue(controller, 0);
+              t.changeTileValue(_controller, 0);
             }
             t.value = 0;
             tiles[i].value = resultValue;
@@ -255,10 +288,10 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
       }
     }
 
-    void swipeUp() => columns.forEach(mergeTiles);
-    void swipeDown() => columns.map((e) => e.reversed.toList()).forEach(mergeTiles);
-    void swipeLeft() => grid.forEach(mergeTiles);
-    void swipeRight() => grid.map((e) => e.reversed.toList()).forEach(mergeTiles);
+    void swipeUp() => _columns.forEach(mergeTiles);
+    void swipeDown() => _columns.map((e) => e.reversed.toList()).forEach(mergeTiles);
+    void swipeLeft() => _grid.forEach(mergeTiles);
+    void swipeRight() => _grid.map((e) => e.reversed.toList()).forEach(mergeTiles);
 
     return Scaffold(
       backgroundColor: backgroundColor,
