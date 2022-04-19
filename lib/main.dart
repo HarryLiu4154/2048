@@ -39,23 +39,97 @@ class GameApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '2080 With Friends',
-      home: Game(),
+      home: HomePage(),
     );
   }
 }
+
+class HomePage extends StatefulWidget {
+  const HomePage({Key? key}) : super(key: key);
+
+  @override
+  _HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+
+  late final List<BottomNavigationBarItem> bnbItems;
+  int _currentPageIndex = 0;
+  final pageController = PageController();
+  void onPageChanged(int index) {
+    setState(() {
+      _currentPageIndex = index;
+    });
+  }
+
+  final _tabs = [
+    Game(),
+    LeaderBoard(),
+    const Center(child: Text("Messages")),
+    const Center(child: Text("Profile")),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        backgroundColor: backgroundColor,
+        body: PageView(
+          children: _tabs,
+          controller: pageController,
+          onPageChanged: onPageChanged,
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _currentPageIndex,
+          backgroundColor: gridColor,
+          type: BottomNavigationBarType.shifting,
+          iconSize: 20.0,
+          items: const <BottomNavigationBarItem> [
+            BottomNavigationBarItem(
+                icon: Icon(Icons.play_arrow),
+                label: "Game",
+                backgroundColor: gridColor),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.emoji_events),
+                label: "Leaderboards",
+                backgroundColor: gridColor),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.message),
+                label: "Friends",
+                backgroundColor: gridColor),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.person),
+                label: "Profile",
+                backgroundColor: gridColor),
+          ],
+          onTap: (index) {
+            // setState(() {
+            //   _currentPageIndex = index;
+            // });
+            pageController.jumpToPage(index);
+          },
+        )
+    );
+  }
+}
+
 
 class Game extends StatefulWidget {
   @override
   _GameState createState() => _GameState();
 }
 
-class _GameState extends State<Game> with SingleTickerProviderStateMixin {
+class _GameState extends State<Game> with TickerProviderStateMixin, AutomaticKeepAliveClientMixin<Game>{
   late AnimationController _controller;
 
   // outside is y axis, inside is x axis
-  List<List<Tile>> _grid =
+  final List<List<Tile>> _grid =
       List.generate(4, (y) => List.generate(4, (x) => Tile(x, y, 0)));
-  List<Tile> _toAdd = [];
+  final List<Tile> _toAdd = [];
 
   // flattening a list of lists, turning into 1D
   Iterable<Tile> get _flatGrid => _grid.expand((element) => element);
@@ -66,11 +140,11 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
 
   Iterable<Tile> get _allTiles => [_flatGrid, _toAdd].expand((element) => element);
 
-  late final List<BottomNavigationBarItem> bnbItems;
-  int _currentIndex = 0;
-
   List _highscores = [];
   int _currentScore = 0;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -329,6 +403,8 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
       )
     );
 
+    super.build(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("2048 With Friends"),
@@ -476,73 +552,55 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
           const SizedBox(width: double.infinity, height: 5.0),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        backgroundColor: gridColor,
-        type: BottomNavigationBarType.shifting,
-        iconSize: 20.0,
-        items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.play_arrow),
-              label: "Game",
-              backgroundColor: gridColor),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.emoji_events),
-              label: "Leaderboards",
-              backgroundColor: gridColor),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.message),
-              label: "Friends",
-              backgroundColor: gridColor),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              label: "Profile",
-              backgroundColor: gridColor),
-        ],
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-      ),
     );
   }
 }
 
-// class CircularFabWidget extends StatefulWidget {
-//   const CircularFabWidget({Key? key}) : super(key: key);
-//
-//   @override
-//   _CircularFabWidgetState createState() => _CircularFabWidgetState();
-// }
-//
-// class _CircularFabWidgetState extends State<CircularFabWidget> {
-//   @override
-//   Widget build(BuildContext context) {
-//     return Flow(
-//       delegate: FlowMenuDelegate(),
-//       children: <IconData> [
-//         Icons.play_arrow,
-//         Icons.person,
-//         Icons.emoji_events,
-//         Icons.call
-//       ].map<Widget>(buildFAB).toList(),
-//     );
-//   }
-//
-//   Widget buildFAB(IconData icon) {
-//     return FloatingActionButton();
-//   }
-// }
-//
-// class FlowMenuDelegate extends FlowDelegate {
-//   @override
-//   void paintChildren(FlowPaintingContext context) {
-//
-//   }
-//
-//   @override
-//   bool shouldRepaint(FlowMenuDelegate oldDelegate) {
-//     return false;
-//   }
-// }
+class LeaderBoard extends StatefulWidget {
+  //const LeaderBoard({Key? key}) : super(key: key);
+
+  @override
+  _LeaderBoardState createState() => _LeaderBoardState();
+}
+
+class _LeaderBoardState extends State<LeaderBoard> {
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Leaderboards"),
+        backgroundColor: backgroundColor,
+        elevation: 0,
+        titleTextStyle: const TextStyle(
+          color: tileTextColor,
+          fontSize: 35,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      body: Container(
+        child: Text("Hello"),
+        // child: ListView.builder(
+        //   scrollDirection: Axis.vertical,
+        //   shrinkWrap: true,
+        //   itemCount: 10,
+        //   itemBuilder: (BuildContext context, int index) {
+        //     return Card(
+        //       elevation: 8.0,
+        //       margin: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
+        //       child: Container(
+        //         decoration: const BoxDecoration(color: gridColor),
+        //         child: Text("Hello"),
+        //       ),
+        //     );
+        //   },
+        // ),
+      ),
+    );
+  }
+}
