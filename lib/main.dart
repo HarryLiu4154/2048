@@ -3,17 +3,20 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:collection/collection.dart';
+import 'package:grouped_list/grouped_list.dart';
+import 'package:intl/intl.dart';
 import 'dart:math';
 import 'tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'highscore.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 const Color gridColor = Color.fromARGB(255, 187, 173, 160);
 const Color emptyTileColor = Color.fromARGB(255, 205, 193, 180);
 const Color tileTextColor = Color.fromARGB(255, 119, 110, 101);
 const Color backgroundColor = Color.fromARGB(255, 250, 248, 239);
-const Color tempC = Color.fromARGB(255, 238, 228, 218);
+const Color eggshellColor = Color.fromARGB(255, 238, 228, 218);
 
 const Map<int, Color> numTileColor = {
   2: Color.fromARGB(255, 238, 228, 218),
@@ -67,8 +70,8 @@ class _HomePageState extends State<HomePage> {
 
   final _tabs = [
     const Game(),
-    const LeaderBoard(),
-    const Center(child: Text("Messages")),
+    const LeaderBoards(),
+    const Messages(),
     const Center(child: Text("Profile")),
   ];
 
@@ -436,7 +439,7 @@ class _GameState extends State<Game> with TickerProviderStateMixin, AutomaticKee
                     style: OutlinedButton.styleFrom(
                       primary: gridColor,
                       side: const BorderSide(color: gridColor, width: 2.0),
-                      backgroundColor: tempC,
+                      backgroundColor: eggshellColor,
                     ),
                     child: const Text(
                       "New Game",
@@ -460,7 +463,7 @@ class _GameState extends State<Game> with TickerProviderStateMixin, AutomaticKee
                     style: OutlinedButton.styleFrom(
                       primary: gridColor,
                       side: const BorderSide(color: gridColor, width: 2.0),
-                      backgroundColor: tempC,
+                      backgroundColor: eggshellColor,
                     ),
                     child: const Text(
                       "Share",
@@ -519,7 +522,7 @@ class _GameState extends State<Game> with TickerProviderStateMixin, AutomaticKee
                     decoration: BoxDecoration(
                         border: Border.all(color: gridColor, width: 2.0),
                         borderRadius: BorderRadius.circular(8.0),
-                        color: tempC),
+                        color: eggshellColor),
                     child: Text(
                       "Score: " + _currentScore.toString(),
                       style: const TextStyle(
@@ -544,7 +547,7 @@ class _GameState extends State<Game> with TickerProviderStateMixin, AutomaticKee
                     decoration: BoxDecoration(
                         border: Border.all(color: gridColor, width: 2.0),
                         borderRadius: BorderRadius.circular(8.0),
-                        color: tempC),
+                        color: eggshellColor),
                     child: Text(
                       "Highscore: " + ((_highscores.isNotEmpty) ? _highscores.first.score : 0).toString(),
                       style: const TextStyle(
@@ -560,18 +563,19 @@ class _GameState extends State<Game> with TickerProviderStateMixin, AutomaticKee
           const SizedBox(width: double.infinity, height: 5.0),
         ],
       ),
+      resizeToAvoidBottomInset: false,
     );
   }
 }
 
-class LeaderBoard extends StatefulWidget {
-  const LeaderBoard({Key? key}) : super(key: key);
+class LeaderBoards extends StatefulWidget {
+  const LeaderBoards({Key? key}) : super(key: key);
 
   @override
-  _LeaderBoardState createState() => _LeaderBoardState();
+  _LeaderBoardsState createState() => _LeaderBoardsState();
 }
 
-class _LeaderBoardState extends State<LeaderBoard> {
+class _LeaderBoardsState extends State<LeaderBoards> {
 
   List _highscores = [];
 
@@ -654,8 +658,132 @@ class _LeaderBoardState extends State<LeaderBoard> {
               },
             );
           }
-
         )
+      ),
+      resizeToAvoidBottomInset: false,
+    );
+  }
+}
+
+class Message {
+  final String content;
+  final DateTime date;
+  final bool isSentByMe;
+
+  const Message({
+    required this.content,
+    required this.date,
+    required this.isSentByMe
+  });
+}
+
+class Messages extends StatefulWidget {
+  const Messages({Key? key}) : super(key: key);
+
+  @override
+  _MessagesState createState() => _MessagesState();
+}
+
+class _MessagesState extends State<Messages> {
+  List<Message> _messages = [
+    Message(
+      content: "I just scored 4096 on 2048 With Friends, beat that!",
+      date: DateTime.now().subtract(const Duration(minutes: 1)),
+      isSentByMe: false
+    ),
+    Message(
+        content: "Letsssss goooo",
+        date: DateTime.now().subtract(const Duration(minutes: 1)),
+        isSentByMe: false
+    ),
+    Message(
+        content: "...",
+        date: DateTime.now().subtract(const Duration(minutes: 1)),
+        isSentByMe: true
+    ),
+  ];
+
+  var textEditingController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Messages"),
+        backgroundColor: backgroundColor,
+        elevation: 0,
+        titleTextStyle: const TextStyle(
+          color: tileTextColor,
+          fontSize: 35,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      body: Container(
+        color: backgroundColor,
+        child: Column(
+          children: [
+            Expanded(child: GroupedListView<Message, DateTime>(
+                padding: const EdgeInsets.all(8.0),
+                reverse: true,
+                order: GroupedListOrder.DESC,
+                // useStickyGroupSeparators: true,
+                // floatingHeader: true,
+                elements: _messages,
+                groupBy: (message) => DateTime(
+                  message.date.year,
+                  message.date.month,
+                  message.date.day
+                ),
+                groupHeaderBuilder: (Message message) => SizedBox(
+                  height: 40,
+                  child: Center(
+                    child: Card(
+                      color: gridColor,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(
+                          DateFormat.yMMMd().format(message.date),
+                          style: const TextStyle(color: Colors.black),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                itemBuilder: (context, Message message) => Align(
+                  alignment: message.isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Card(
+                    elevation: 8,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Text(message.content),
+                    ),
+                  ),
+                )
+            )),
+            Container(
+              color: emptyTileColor,
+              child: TextField(
+                decoration: const InputDecoration(
+                  contentPadding: EdgeInsets.all(12),
+                  hintText: "Type your message here...",
+                ),
+                onSubmitted: (text) {
+                  if (text.isNotEmpty) {
+                    final message = Message(
+                        content: text,
+                        date: DateTime.now(),
+                        isSentByMe: true
+                    );
+                    setState(() {
+                      _messages.add(message);
+                    });
+                  }
+                  textEditingController.clear();
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
