@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:collection/collection.dart';
 import 'dart:math';
 import 'tile.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'highscore.dart';
 
 const Color gridColor = Color.fromARGB(255, 187, 173, 160);
 const Color emptyTileColor = Color.fromARGB(255, 205, 193, 180);
@@ -65,7 +69,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   late final List<BottomNavigationBarItem> bnbItems;
   int _currentIndex = 0;
 
-  bool _gameOver = false;
+  List _highscores = [];
   int _currentScore = 0;
 
   @override
@@ -106,6 +110,8 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
       element.resetAnimations();
       _currentScore += element.value;
     }
+
+    getHighscores();
   }
 
   bool canSwipe(List<Tile> tiles) {
@@ -219,17 +225,33 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
   void swipeRight() =>
       _grid.map((e) => e.reversed.toList()).forEach(mergeTiles);
 
+  Future<void> saveCurrentScoreToHighscores(int num) async {
+    Highscore(username: "Shenghao Liu", score: num).saveScore();
+  }
+
+  getHighscores() async {
+    var prefs = await SharedPreferences.getInstance();
+    String? source = prefs.getString("highscores");
+    var maps = (source != null) ? jsonDecode(source) : [];
+    setState(() {
+      _highscores = maps.map((e) => Highscore.fromMap(e)).toList();
+    });
+  }
+
   void resetGame() {
+    saveCurrentScoreToHighscores(_currentScore);
     setState(() {
       _flatGrid.forEach((t) {
         t.value = 0;
         t.resetAnimations();
       });
       _toAdd.clear();
+      _currentScore = 0;
       addNewTile();
       addNewTile();
       _controller.forward(from: 0);
     });
+    getHighscores();
   }
 
   void confirmResetGame(BuildContext context, Text title, Text content) {
@@ -440,7 +462,7 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
                         borderRadius: BorderRadius.circular(8.0),
                         color: tempC),
                     child: Text(
-                      "Highscore: " + _currentScore.toString(),
+                      "Highscore: " + ((_highscores.isNotEmpty) ? _highscores.first.score : 0).toString(),
                       style: const TextStyle(
                           color: tileTextColor,
                           fontSize: 16,
