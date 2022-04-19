@@ -7,6 +7,7 @@ import 'dart:math';
 import 'tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'highscore.dart';
+import 'package:flutter/services.dart';
 
 const Color gridColor = Color.fromARGB(255, 187, 173, 160);
 const Color emptyTileColor = Color.fromARGB(255, 205, 193, 180);
@@ -31,13 +32,15 @@ const Map<int, Color> numTileColor = {
 };
 
 void main() {
-  runApp(GameApp());
+  runApp(const GameApp());
 }
 
 class GameApp extends StatelessWidget {
+  const GameApp({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       title: '2080 With Friends',
       home: HomePage(),
     );
@@ -63,8 +66,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   final _tabs = [
-    Game(),
-    LeaderBoard(),
+    const Game(),
+    const LeaderBoard(),
     const Center(child: Text("Messages")),
     const Center(child: Text("Profile")),
   ];
@@ -79,6 +82,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
         backgroundColor: backgroundColor,
         body: PageView(
+          physics: const NeverScrollableScrollPhysics(),
           children: _tabs,
           controller: pageController,
           onPageChanged: onPageChanged,
@@ -119,6 +123,8 @@ class _HomePageState extends State<HomePage> {
 
 
 class Game extends StatefulWidget {
+  const Game({Key? key}) : super(key: key);
+
   @override
   _GameState createState() => _GameState();
 }
@@ -138,7 +144,7 @@ class _GameState extends State<Game> with TickerProviderStateMixin, AutomaticKee
   Iterable<List<Tile>> get _columns =>
       List.generate(4, (x) => List.generate(4, (y) => _grid[y][x]));
 
-  Iterable<Tile> get _allTiles => [_flatGrid, _toAdd].expand((element) => element);
+  //Iterable<Tile> get _allTiles => [_flatGrid, _toAdd].expand((element) => element);
 
   List _highscores = [];
   int _currentScore = 0;
@@ -315,10 +321,10 @@ class _GameState extends State<Game> with TickerProviderStateMixin, AutomaticKee
   void resetGame() {
     saveCurrentScoreToHighscores(_currentScore);
     setState(() {
-      _flatGrid.forEach((t) {
+      for (var t in _flatGrid) {
         t.value = 0;
         t.resetAnimations();
-      });
+      }
       _toAdd.clear();
       _currentScore = 0;
       addNewTile();
@@ -463,7 +469,9 @@ class _GameState extends State<Game> with TickerProviderStateMixin, AutomaticKee
                           fontSize: 16,
                           fontWeight: FontWeight.bold),
                     ),
-                    onPressed: () {},
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: "I just scored " + _currentScore.toString() + " on 2048 With Friends, beat that!"));
+                    },
                   ),
                 ),
               ],
@@ -557,7 +565,7 @@ class _GameState extends State<Game> with TickerProviderStateMixin, AutomaticKee
 }
 
 class LeaderBoard extends StatefulWidget {
-  //const LeaderBoard({Key? key}) : super(key: key);
+  const LeaderBoard({Key? key}) : super(key: key);
 
   @override
   _LeaderBoardState createState() => _LeaderBoardState();
@@ -565,8 +573,54 @@ class LeaderBoard extends StatefulWidget {
 
 class _LeaderBoardState extends State<LeaderBoard> {
 
+  List _highscores = [];
+
+  getHighscores() async {
+    var prefs = await SharedPreferences.getInstance();
+    String? source = prefs.getString("highscores");
+    var maps = (source != null) ? jsonDecode(source) : [];
+    setState(() {
+      _highscores = maps.map((e) => Highscore.fromMap(e)).toList();
+    });
+  }
+
+  Card makeCard(Highscore highscore) => Card(
+    elevation: 8.0,
+    margin: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
+    child: Container(
+      decoration: const BoxDecoration(color: gridColor),
+      child: makeListTile(highscore)
+    ),
+  );
+
+  ListTile makeListTile(Highscore highscore) => ListTile(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+    leading: Container(
+      padding: const EdgeInsets.only(right: 12.0),
+      decoration: const BoxDecoration(
+        border: Border(
+          right: BorderSide(
+            width: 1.0,
+            color: Colors.white24
+          )
+        )
+      ),
+      child: const Icon(Icons.person, color: Colors.white),
+    ),
+    title: Text(
+      highscore.score.toString(),
+      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold,)
+    ),
+    subtitle: Row(
+      children: <Widget>[
+        Text(highscore.username, style: const TextStyle(color: Colors.white))
+      ],
+    ),
+  );
+
   @override
   void initState() {
+    //_highscores = getHighscores();
     super.initState();
   }
 
@@ -584,22 +638,24 @@ class _LeaderBoardState extends State<LeaderBoard> {
         ),
       ),
       body: Container(
-        child: Text("Hello"),
-        // child: ListView.builder(
-        //   scrollDirection: Axis.vertical,
-        //   shrinkWrap: true,
-        //   itemCount: 10,
-        //   itemBuilder: (BuildContext context, int index) {
-        //     return Card(
-        //       elevation: 8.0,
-        //       margin: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
-        //       child: Container(
-        //         decoration: const BoxDecoration(color: gridColor),
-        //         child: Text("Hello"),
-        //       ),
-        //     );
-        //   },
-        // ),
+        color: backgroundColor,
+        child: FutureBuilder(
+          future: getHighscores(),
+          builder: (context, projectSnap) {
+            if (projectSnap.connectionState == ConnectionState.none && projectSnap.hasData) {
+              return Container();
+            }
+            return ListView.builder(
+              scrollDirection: Axis.vertical,
+              shrinkWrap: true,
+              itemCount: _highscores.length,
+              itemBuilder: (BuildContext context, int index) {
+                return makeCard(_highscores[index]);
+              },
+            );
+          }
+
+        )
       ),
     );
   }
