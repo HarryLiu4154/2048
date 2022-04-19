@@ -158,14 +158,19 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
 
       addNewTile();
 
-      if (!canSwipeUp() &&
-          !canSwipeDown() &&
-          !canSwipeLeft() &&
-          !canSwipeRight()) {
-        _gameOver = true; //CHANGE THIS LATER TO POPUP
-      }
       _controller.forward(from: 0);
     });
+
+    if (!canSwipeUp() &&
+        !canSwipeDown() &&
+        !canSwipeLeft() &&
+        !canSwipeRight()) {
+      confirmResetGame(
+        context,
+        const Text("Game Over"),
+        const Text("Do you wish to start a new game?"),
+      );
+    }
   }
 
   // This is a decently complicated algorithm which I have mostly sourced from THKP
@@ -227,10 +232,10 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
     });
   }
 
-  void confirmResetGame(BuildContext context) {
+  void confirmResetGame(BuildContext context, Text title, Text content) {
     var alertDialog = AlertDialog(
-      title: Text("Confirm"),
-      content: Text("Are you sure you wish to start a new game?"),
+      title: title,
+      content: content,
       actions: [
         TextButton(
             onPressed: () {
@@ -337,7 +342,11 @@ class _GameState extends State<Game> with SingleTickerProviderStateMixin {
                           fontWeight: FontWeight.bold),
                     ),
                     onPressed: () {
-                      confirmResetGame(context);
+                      confirmResetGame(
+                        context,
+                        const Text("Confirm"),
+                        const Text("Are you sure you wish to start a new game?"),
+                      );
                     },
                   ),
                 ),
