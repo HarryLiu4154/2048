@@ -10,7 +10,6 @@ import 'tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'highscore.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/date_symbol_data_local.dart';
 
 const Color gridColor = Color.fromARGB(255, 187, 173, 160);
 const Color emptyTileColor = Color.fromARGB(255, 205, 193, 180);
@@ -44,7 +43,7 @@ class GameApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
-      title: '2080 With Friends',
+      title: '2048 With Friends',
       home: HomePage(),
     );
   }
